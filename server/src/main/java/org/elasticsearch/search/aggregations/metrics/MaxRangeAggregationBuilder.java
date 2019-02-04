@@ -28,7 +28,7 @@ import org.elasticsearch.search.aggregations.AggregationBuilder;
 import org.elasticsearch.search.aggregations.AggregatorFactories.Builder;
 import org.elasticsearch.search.aggregations.AggregatorFactory;
 import org.elasticsearch.search.aggregations.support.ValueType;
-import org.elasticsearch.search.aggregations.support.ValuesSource.Numeric;
+import org.elasticsearch.search.aggregations.support.ValuesSource;
 import org.elasticsearch.search.aggregations.support.ValuesSourceAggregationBuilder;
 import org.elasticsearch.search.aggregations.support.ValuesSourceConfig;
 import org.elasticsearch.search.aggregations.support.ValuesSourceParserHelper;
@@ -38,13 +38,13 @@ import org.elasticsearch.search.internal.SearchContext;
 import java.io.IOException;
 import java.util.Map;
 
-public class MaxRangeAggregationBuilder extends ValuesSourceAggregationBuilder.LeafOnly<Numeric, MaxRangeAggregationBuilder> {
+public class MaxRangeAggregationBuilder extends ValuesSourceAggregationBuilder.LeafOnly<ValuesSource.Bytes, MaxRangeAggregationBuilder> {
     public static final String NAME = "max";
 
     private static final ObjectParser<MaxRangeAggregationBuilder, Void> PARSER;
     static {
         PARSER = new ObjectParser<>(MaxRangeAggregationBuilder.NAME);
-        ValuesSourceParserHelper.declareNumericFields(PARSER, true, true, false);
+        ValuesSourceParserHelper.declareBytesFields(PARSER, true, true);
     }
 
     public static AggregationBuilder parse(String aggregationName, XContentParser parser) throws IOException {
@@ -52,7 +52,8 @@ public class MaxRangeAggregationBuilder extends ValuesSourceAggregationBuilder.L
     }
 
     public MaxRangeAggregationBuilder(String name) {
-        super(name, ValuesSourceType.NUMERIC, ValueType.NUMERIC);
+        // TODO: probably shouldn't be Numeric?
+        super(name, ValuesSourceType.BYTES, ValueType.NUMERIC);
     }
 
     protected MaxRangeAggregationBuilder(MaxRangeAggregationBuilder clone, Builder factoriesBuilder, Map<String, Object> metaData) {
@@ -68,6 +69,7 @@ public class MaxRangeAggregationBuilder extends ValuesSourceAggregationBuilder.L
      * Read from a stream.
      */
     public MaxRangeAggregationBuilder(StreamInput in) throws IOException {
+        // TODO: probably shouldn't be Numeric?
         super(in, ValuesSourceType.NUMERIC, ValueType.NUMERIC);
     }
 
@@ -77,9 +79,9 @@ public class MaxRangeAggregationBuilder extends ValuesSourceAggregationBuilder.L
     }
 
     @Override
-    protected MaxAggregatorFactory innerBuild(SearchContext context, ValuesSourceConfig<Numeric> config,
+    protected MaxRangeAggregatorFactory innerBuild(SearchContext context, ValuesSourceConfig<ValuesSource.Bytes> config,
             AggregatorFactory<?> parent, Builder subFactoriesBuilder) throws IOException {
-        return new MaxAggregatorFactory(name, config, context, parent, subFactoriesBuilder, metaData);
+        return new MaxRangeAggregatorFactory(name, config, context, parent, subFactoriesBuilder, metaData);
     }
 
     @Override

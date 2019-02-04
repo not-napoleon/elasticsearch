@@ -30,7 +30,6 @@ import org.apache.lucene.store.Directory;
 import org.apache.lucene.util.BytesRef;
 import org.elasticsearch.common.CheckedConsumer;
 import org.elasticsearch.index.mapper.MappedFieldType;
-import org.elasticsearch.index.mapper.NumberFieldMapper;
 import org.elasticsearch.index.mapper.RangeFieldMapper;
 import org.elasticsearch.search.aggregations.AggregatorTestCase;
 
@@ -67,10 +66,9 @@ public class MaxRangeAggregatorTests extends AggregatorTestCase {
 
         IndexReader indexReader = DirectoryReader.open(directory);
         IndexSearcher indexSearcher = newSearcher(indexReader, true, true);
-        //TODO: Use the range max aggregation here
+        MaxRangeAggregationBuilder aggregationBuilder = new MaxRangeAggregationBuilder(EXPECTED_FIELD_NAME).field(EXPECTED_FIELD_NAME);
 
-        MaxRangeAggregationBuilder aggregationBuilder = new MaxRangeAggregationBuilder(EXPECTED_FIELD_NAME);
-        MappedFieldType fieldType = new NumberFieldMapper.NumberFieldType(NumberFieldMapper.NumberType.INTEGER);
+        MappedFieldType fieldType = new RangeFieldMapper.Builder(EXPECTED_FIELD_NAME, RangeFieldMapper.RangeType.DOUBLE).fieldType();
         fieldType.setName(EXPECTED_FIELD_NAME);
 
         MaxRangeAggregator aggregator = createAggregator(query, aggregationBuilder, indexSearcher, createIndexSettings(), fieldType);
