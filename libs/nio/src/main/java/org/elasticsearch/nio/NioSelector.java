@@ -69,7 +69,7 @@ public class NioSelector implements Closeable {
     public NioSelector(EventHandler eventHandler, Selector selector) {
         this.selector = selector;
         this.eventHandler = eventHandler;
-        this.ioBuffer = ByteBuffer.allocateDirect(1 << 16);
+        this.ioBuffer = ByteBuffer.allocateDirect(1 << 18);
     }
 
     /**
@@ -238,12 +238,13 @@ public class NioSelector implements Closeable {
             }
 
             if (channelContext.isConnectComplete()) {
-                if ((ops & SelectionKey.OP_WRITE) != 0) {
-                    handleWrite(channelContext);
-                }
-
-                if ((ops & SelectionKey.OP_READ) != 0) {
-                    handleRead(channelContext);
+                if (channelContext.selectorShouldClose() == false) {
+                    if ((ops & SelectionKey.OP_WRITE) != 0) {
+                        handleWrite(channelContext);
+                    }
+                    if (channelContext.selectorShouldClose() == false && (ops & SelectionKey.OP_READ) != 0) {
+                        handleRead(channelContext);
+                    }
                 }
             }
             eventHandler.postHandling(channelContext);
@@ -336,7 +337,9 @@ public class NioSelector implements Closeable {
         }
 
         if (shouldFlushAfterQueuing) {
-            handleWrite(context);
+            if (context.selectorShouldClose() == false) {
+                handleWrite(context);
+            }
             eventHandler.postHandling(context);
         }
     }

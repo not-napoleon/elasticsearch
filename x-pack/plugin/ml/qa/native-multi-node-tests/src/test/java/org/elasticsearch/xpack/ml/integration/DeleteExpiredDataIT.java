@@ -180,7 +180,7 @@ public class DeleteExpiredDataIT extends MlNativeAutodetectIntegTestCase {
         bulkRequestBuilder.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
         for (int i = 0; i < 10010; i++) {
             String docId = "non_existing_job_" + randomFrom("model_state_1234567#" + i, "quantiles", "categorizer_state#" + i);
-            IndexRequest indexRequest = new IndexRequest(AnomalyDetectorsIndex.jobStateIndexName(), "doc", docId);
+            IndexRequest indexRequest = new IndexRequest(AnomalyDetectorsIndex.jobStateIndexWriteAlias(), "doc", docId);
             indexRequest.source(Collections.emptyMap());
             bulkRequestBuilder.add(indexRequest);
         }
@@ -239,17 +239,27 @@ public class DeleteExpiredDataIT extends MlNativeAutodetectIntegTestCase {
         }
 
         // Verify .ml-state doesn't contain unused state documents
-        SearchResponse stateDocsResponse = client().prepareSearch(AnomalyDetectorsIndex.jobStateIndexName())
+        SearchResponse stateDocsResponse = client().prepareSearch(AnomalyDetectorsIndex.jobStateIndexPattern())
                 .setFetchSource(false)
+                .setTrackTotalHits(true)
                 .setSize(10000)
                 .get();
 
         // Assert at least one state doc for each job
         assertThat(stateDocsResponse.getHits().getTotalHits().value, greaterThanOrEqualTo(5L));
 
+        int nonExistingJobDocsCount = 0;
+        List<String> nonExistingJobExampleIds = new ArrayList<>();
         for (SearchHit hit : stateDocsResponse.getHits().getHits()) {
-            assertThat(hit.getId().startsWith("non_existing_job"), is(false));
+            if (hit.getId().startsWith("non_existing_job")) {
+                nonExistingJobDocsCount++;
+                if (nonExistingJobExampleIds.size() < 10) {
+                    nonExistingJobExampleIds.add(hit.getId());
+                }
+            }
         }
+        assertThat("Documents for non_existing_job are still around; examples: " + nonExistingJobExampleIds,
+            nonExistingJobDocsCount, equalTo(0));
     }
 
     private static Job.Builder newJobBuilder(String id) {

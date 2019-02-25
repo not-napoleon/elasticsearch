@@ -38,6 +38,7 @@ import org.elasticsearch.cluster.ClusterState;
 import org.elasticsearch.cluster.block.ClusterBlock;
 import org.elasticsearch.cluster.block.ClusterBlockException;
 import org.elasticsearch.cluster.metadata.IndexMetaData;
+import org.elasticsearch.cluster.metadata.IndexNameExpressionResolver;
 import org.elasticsearch.cluster.metadata.MappingMetaData;
 import org.elasticsearch.common.Nullable;
 import org.elasticsearch.common.Strings;
@@ -157,16 +158,16 @@ public class JobResultsProvider {
      */
     public void checkForLeftOverDocuments(Job job, ActionListener<Boolean> listener) {
 
-        SearchRequestBuilder stateDocSearch = client.prepareSearch(AnomalyDetectorsIndex.jobStateIndexName())
+        SearchRequestBuilder stateDocSearch = client.prepareSearch(AnomalyDetectorsIndex.jobStateIndexPattern())
                 .setQuery(QueryBuilders.idsQuery().addIds(CategorizerState.documentId(job.getId(), 1),
                         CategorizerState.v54DocumentId(job.getId(), 1)))
-                .setIndicesOptions(IndicesOptions.lenientExpandOpen());
+                .setIndicesOptions(IndicesOptions.strictExpand());
 
-        SearchRequestBuilder quantilesDocSearch = client.prepareSearch(AnomalyDetectorsIndex.jobStateIndexName())
+        SearchRequestBuilder quantilesDocSearch = client.prepareSearch(AnomalyDetectorsIndex.jobStateIndexPattern())
                 .setQuery(QueryBuilders.idsQuery().addIds(Quantiles.documentId(job.getId()), Quantiles.v54DocumentId(job.getId())))
-                .setIndicesOptions(IndicesOptions.lenientExpandOpen());
+                .setIndicesOptions(IndicesOptions.strictExpand());
 
-        String resultsIndexName = job.getResultsIndexName();
+        String resultsIndexName = job.getInitialResultsIndexName();
         SearchRequestBuilder resultDocSearch = client.prepareSearch(resultsIndexName)
                 .setIndicesOptions(IndicesOptions.lenientExpandOpen())
                 .setQuery(QueryBuilders.termQuery(Job.ID.getPreferredName(), job.getId()))
@@ -252,7 +253,25 @@ public class JobResultsProvider {
 
         String readAliasName = AnomalyDetectorsIndex.jobResultsAliasedName(job.getId());
         String writeAliasName = AnomalyDetectorsIndex.resultsWriteAlias(job.getId());
-        String indexName = job.getResultsIndexName();
+        String tempIndexName = job.getInitialResultsIndexName();
+
+        // Our read/write aliases should point to the concrete index
+        // If the initial index is NOT an alias, either it is already a concrete index, or it does not exist yet
+        if (state.getMetaData().hasAlias(tempIndexName)) {
+            IndexNameExpressionResolver resolver = new IndexNameExpressionResolver();
+            String[] concreteIndices = resolver.concreteIndexNames(state, IndicesOptions.lenientExpandOpen(), tempIndexName);
+
+            // SHOULD NOT be closed as in typical call flow checkForLeftOverDocuments already verified this
+            // if it is closed, we bailout and return an error
+            if (concreteIndices.length == 0) {
+                finalListener.onFailure(
+                    ExceptionsHelper.badRequestException("Cannot create job [{}] as it requires closed index {}", job.getId(),
+                        tempIndexName));
+                return;
+            }
+            tempIndexName = concreteIndices[0];
+        }
+        final String indexName = tempIndexName;
 
         final ActionListener<Boolean> createAliasListener = ActionListener.wrap(success -> {
             final IndicesAliasesRequest request = client.admin().indices().prepareAliases()
@@ -396,7 +415,7 @@ public class JobResultsProvider {
 
         AutodetectParams.Builder paramsBuilder = new AutodetectParams.Builder(job.getId());
         String resultsIndex = AnomalyDetectorsIndex.jobResultsAliasedName(jobId);
-        String stateIndex = AnomalyDetectorsIndex.jobStateIndexName();
+        String stateIndex = AnomalyDetectorsIndex.jobStateIndexPattern();
 
         MultiSearchRequestBuilder msearch = client.prepareMultiSearch()
                 .add(createLatestDataCountsSearch(resultsIndex, jobId))
