@@ -53,7 +53,7 @@ public class MaxRangeAggregationBuilder extends ValuesSourceAggregationBuilder.L
 
     public MaxRangeAggregationBuilder(String name) {
         // TODO: probably shouldn't be Numeric?
-        super(name, ValuesSourceType.BYTES, ValueType.NUMERIC);
+        super(name, ValuesSourceType.BYTES, ValueType.RANGE);
     }
 
     protected MaxRangeAggregationBuilder(MaxRangeAggregationBuilder clone, Builder factoriesBuilder, Map<String, Object> metaData) {
@@ -70,7 +70,7 @@ public class MaxRangeAggregationBuilder extends ValuesSourceAggregationBuilder.L
      */
     public MaxRangeAggregationBuilder(StreamInput in) throws IOException {
         // TODO: probably shouldn't be Numeric?
-        super(in, ValuesSourceType.NUMERIC, ValueType.NUMERIC);
+        super(in, ValuesSourceType.BYTES, ValueType.RANGE);
     }
 
     @Override
