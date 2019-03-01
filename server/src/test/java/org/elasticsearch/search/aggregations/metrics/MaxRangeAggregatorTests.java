@@ -47,7 +47,7 @@ public class MaxRangeAggregatorTests extends AggregatorTestCase {
         BytesRef encodedRange =
             rangeType.encodeRanges(singleton(new RangeFieldMapper.Range(rangeType, 1.0D, 10.0D, true , true)));
 
-        testCase(new DocValuesFieldExistsQuery("number"), iw -> {
+        testCase(new DocValuesFieldExistsQuery(EXPECTED_FIELD_NAME), iw -> {
             iw.addDocument(singleton(new BinaryDocValuesField(EXPECTED_FIELD_NAME, encodedRange)));
         }, max -> {
             assertEquals(10.0D, max.getValue(), 0);
