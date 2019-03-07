@@ -43,7 +43,7 @@ public class MaxRangeAggregatorTests extends AggregatorTestCase {
     private static final String EXPECTED_FIELD_NAME = "range";
 
     public void testSimpleRangeMax() throws IOException {
-        RangeFieldMapper.RangeType rangeType = RangeFieldMapper.RangeType.LONG;
+        RangeFieldMapper.RangeType rangeType = RangeFieldMapper.RangeType.DOUBLE;
         BytesRef encodedRange =
             rangeType.encodeRanges(singleton(new RangeFieldMapper.Range(rangeType, 1.0D, 10.0D, true , true)));
 
