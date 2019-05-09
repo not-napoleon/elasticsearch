@@ -358,7 +358,7 @@ public enum RangeType {
         @Override
         public Double doubleValue(Object endpointValue) {
             assert endpointValue instanceof Double;
-            return (Double) endpointValue;
+            return (Double)endpointValue;
         }
 
         @Override
@@ -430,7 +430,7 @@ public enum RangeType {
         }
 
         @Override
-        public Double doubleValue(Object endpointValue) {
+        public Double doubleValue (Object endpointValue) {
             return LONG.doubleValue(endpointValue);
         }
 
@@ -662,10 +662,6 @@ public enum RangeType {
      * @return endpointValue as a Double
      */
     public abstract Double doubleValue(Object endpointValue);
-
-    public boolean isNumeric() {
-        return numberType != null;
-    }
 
     public abstract Query dvRangeQuery(String field, BinaryDocValuesRangeQuery.QueryType queryType, Object from, Object to,
                                        boolean includeFrom, boolean includeTo);
