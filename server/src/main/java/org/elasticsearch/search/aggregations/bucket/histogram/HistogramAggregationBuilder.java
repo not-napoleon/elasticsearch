@@ -137,9 +137,8 @@ public class HistogramAggregationBuilder extends ValuesSourceAggregationBuilder<
     }
 
     @Override
-    protected boolean serializeTargetValueType(Version version) {
-        // TODO: Update version number after backport
-        return version.onOrAfter(Version.V_8_0_0);
+    protected boolean serializeTargetValueType() {
+        return true;
     }
 
     @Override
