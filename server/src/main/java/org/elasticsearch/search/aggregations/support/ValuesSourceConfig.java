@@ -118,7 +118,11 @@ public class ValuesSourceConfig<VS extends ValuesSource> {
             } else if (fieldType instanceof RangeFieldMapper.RangeFieldType) {
                 config = new ValuesSourceConfig<>(ValuesSourceType.RANGE);
             } else {
-                config = new ValuesSourceConfig<>(ValuesSourceType.BYTES);
+                if (fieldType instanceof RangeFieldMapper.RangeFieldType) {
+                    config = new ValuesSourceConfig<>(ValuesSourceType.RANGE);
+                } else {
+                    config = new ValuesSourceConfig<>(ValuesSourceType.BYTES);
+                }
             }
 
         } else {

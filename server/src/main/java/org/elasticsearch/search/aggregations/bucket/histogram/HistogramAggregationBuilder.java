@@ -85,7 +85,8 @@ public class HistogramAggregationBuilder extends ValuesSourceAggregationBuilder<
     }
 
     public static HistogramAggregationBuilder parse(String aggregationName, XContentParser parser) throws IOException {
-        return PARSER.parse(parser, new HistogramAggregationBuilder(aggregationName, ValueType.DOUBLE), null);
+        // TODO: Fix hard coded double here?
+        return PARSER.parse(parser, new HistogramAggregationBuilder(aggregationName), null);
     }
 
     private double interval;
@@ -103,8 +104,8 @@ public class HistogramAggregationBuilder extends ValuesSourceAggregationBuilder<
     }
 
     /** Create a new builder with the given name. */
-    public HistogramAggregationBuilder(String name, ValueType valueType) {
-        super(name, ValuesSourceType.ANY, valueType);
+    public HistogramAggregationBuilder(String name) {
+        super(name, ValuesSourceType.ANY, null);
     }
 
     protected HistogramAggregationBuilder(HistogramAggregationBuilder clone, Builder factoriesBuilder, Map<String, Object> metaData) {
@@ -124,7 +125,6 @@ public class HistogramAggregationBuilder extends ValuesSourceAggregationBuilder<
     }
 
     /** Read from a stream, for internal use only. */
-    // TODO: Fix this for new variable value type
     public HistogramAggregationBuilder(StreamInput in) throws IOException {
         super(in, ValuesSourceType.ANY);
         order = InternalOrder.Streams.readHistogramOrder(in);
