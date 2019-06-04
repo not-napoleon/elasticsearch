@@ -85,7 +85,6 @@ public class HistogramAggregationBuilder extends ValuesSourceAggregationBuilder<
     }
 
     public static HistogramAggregationBuilder parse(String aggregationName, XContentParser parser) throws IOException {
-        // TODO: Fix hard coded double here?
         return PARSER.parse(parser, new HistogramAggregationBuilder(aggregationName), null);
     }
 
