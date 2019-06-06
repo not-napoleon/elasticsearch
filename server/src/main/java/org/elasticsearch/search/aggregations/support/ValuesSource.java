@@ -217,16 +217,6 @@ public abstract class ValuesSource {
                 return indexFieldData.load(context).getBytesValues();
             }
 
-            public static class RangeFieldData extends FieldData {
-               private final RangeFieldMapper.RangeType rangeType;
-
-               public RangeFieldData (IndexFieldData<?> indexFieldData, RangeFieldMapper.RangeType rangeType) {
-                   super(indexFieldData);
-                   this.rangeType = rangeType;
-               }
-
-               public RangeFieldMapper.RangeType rangeType() { return rangeType; }
-            }
         }
 
         public static class Script extends Bytes {
