@@ -25,6 +25,47 @@ import java.util.function.Function;
 /**
  * A configuration that tells aggregations how to retrieve data from the index
  * in order to run a specific aggregation.
+ *
+ * How we select the {@link ValuesSourceType}, a simple flow chart:
+ *
+ *                                 +-------+
+ *                 +----------No---+Script?+--Yes-+
+ *                 |               +-------+      |
+ *             +---+---+                +---------+--+
+ *             |Field? +--No--+         | User Hint? +--+
+ *             +---+---+      |         +--+---------+  |
+ *                 |       +--+--+         |           Yes
+ *                Yes      |Error|         |            |
+ *                 |       +-----+        No       +----+---+
+ *           +-----+-+                     |       |Use User|
+ *           |Mapped?+--Yes-----+          |       | Hint.  |
+ *           +-----+-+          |          |       +--------+
+ *                No            |      +---+--+
+ *                 |            |      |Field?+---Yes----+
+ *             +---+--+         |      +-+----+          |
+ *       +--No-+ User |         |        |               |
+ *       |     | Hint?|         |       No          +----+----+
+ *       |     +---+--+         |        |          |Use Field|
+ *       |         | Yes        |    +---+-------+  |  Type.  |
+ *       |       +-+------+     |    |Use Default|  +---------+
+ *       |       |Use User|     |    |    Type   |
+ *       |       |  Hint  |     |    +-----------+
+ *       |       +--------+     |
+ *       |                   +--|--+
+ *       |                   |User --Yes-----+
+ * +-----+-----+       +-No--+Hint?|         |
+ * |Use Default|       |     +-----+  +------+-----+
+ * |Type       | +-----+----+         | User Type  |
+ * +-----------+ |Use Mapped|         |    ==      |
+ *               |Field Type|         |Mapped Type?|
+ *               +----------+         +--|------|--+
+ *                                       |      |
+ *                                      No     Yes
+ *                                       |      |
+ *                                    +--+--+ +-+------+
+ *                                    |Error| |Use That|
+ *                                    +-----+ |Type.   |
+ *                                            +--------+
  */
 public class ValuesSourceConfig {
 
