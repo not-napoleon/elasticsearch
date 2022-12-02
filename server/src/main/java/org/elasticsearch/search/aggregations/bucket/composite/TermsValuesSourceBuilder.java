@@ -10,6 +10,7 @@ package org.elasticsearch.search.aggregations.bucket.composite;
 
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
+import org.elasticsearch.Version;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.common.util.BigArrays;
@@ -22,11 +23,13 @@ import org.elasticsearch.search.aggregations.support.ValuesSourceRegistry;
 import org.elasticsearch.search.aggregations.support.ValuesSourceType;
 import org.elasticsearch.search.sort.SortOrder;
 import org.elasticsearch.xcontent.ObjectParser;
+import org.elasticsearch.xcontent.ParseField;
 import org.elasticsearch.xcontent.XContentBuilder;
 import org.elasticsearch.xcontent.XContentParser;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.LongConsumer;
 import java.util.function.LongUnaryOperator;
 
@@ -36,12 +39,15 @@ import java.util.function.LongUnaryOperator;
  */
 public class TermsValuesSourceBuilder extends CompositeValuesSourceBuilder<TermsValuesSourceBuilder> {
 
+    private String executionHint;
+
     @FunctionalInterface
     public interface TermsCompositeSupplier {
         CompositeValuesSourceConfig apply(
             ValuesSourceConfig config,
             String name,
             boolean hasScript, // probably redundant with the config, but currently we check this two different ways...
+            String executionHint,
             String format,
             boolean missingBucket,
             MissingOrder missingOrder,
@@ -59,6 +65,12 @@ public class TermsValuesSourceBuilder extends CompositeValuesSourceBuilder<Terms
     static {
         PARSER = new ObjectParser<>(TermsValuesSourceBuilder.TYPE);
         CompositeValuesSourceParserHelper.declareValuesSourceFields(PARSER);
+        PARSER.declareField(
+            TermsValuesSourceBuilder::executionHint,
+            XContentParser::text,
+            new ParseField("executionHint"),
+            ObjectParser.ValueType.STRING
+        );
     }
 
     static TermsValuesSourceBuilder parse(String name, XContentParser parser) throws IOException {
@@ -71,10 +83,46 @@ public class TermsValuesSourceBuilder extends CompositeValuesSourceBuilder<Terms
 
     protected TermsValuesSourceBuilder(StreamInput in) throws IOException {
         super(in);
+        if (in.getVersion().onOrAfter(Version.V_8_7_0)) {
+            this.executionHint = in.readOptionalString();
+        }
     }
 
     @Override
-    protected void innerWriteTo(StreamOutput out) throws IOException {}
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        if (super.equals(o) == false) {
+            return false;
+        }
+        TermsValuesSourceBuilder that = (TermsValuesSourceBuilder) o;
+        return Objects.equals(executionHint, that.executionHint);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(super.hashCode(), executionHint);
+    }
+
+    public TermsValuesSourceBuilder executionHint(String executionHint) {
+        this.executionHint = executionHint;
+        return this;
+    }
+
+    public String getExecutionHint() {
+        return executionHint;
+    }
+
+    @Override
+    protected void innerWriteTo(StreamOutput out) throws IOException {
+        if (out.getVersion().onOrAfter(Version.V_8_7_0)) {
+            out.writeOptionalString(executionHint);
+        }
+    }
 
     @Override
     protected void doXContentBody(XContentBuilder builder, Params params) throws IOException {}
@@ -88,7 +136,7 @@ public class TermsValuesSourceBuilder extends CompositeValuesSourceBuilder<Terms
         builder.register(
             REGISTRY_KEY,
             List.of(CoreValuesSourceType.DATE, CoreValuesSourceType.NUMERIC, CoreValuesSourceType.BOOLEAN),
-            (valuesSourceConfig, name, hasScript, format, missingBucket, missingOrder, order) -> {
+            (valuesSourceConfig, name, hasScript, executionHint, format, missingBucket, missingOrder, order) -> {
                 final DocValueFormat docValueFormat;
                 if (format == null && valuesSourceConfig.valueSourceType() == CoreValuesSourceType.DATE) {
                     // defaults to the raw format on date fields (preserve timestamp as longs).
@@ -150,50 +198,59 @@ public class TermsValuesSourceBuilder extends CompositeValuesSourceBuilder<Terms
         builder.register(
             REGISTRY_KEY,
             List.of(CoreValuesSourceType.KEYWORD, CoreValuesSourceType.IP),
-            (valuesSourceConfig, name, hasScript, format, missingBucket, missingOrder, order) -> new CompositeValuesSourceConfig(
+            (
+                valuesSourceConfig,
                 name,
-                valuesSourceConfig.fieldType(),
-                valuesSourceConfig.getValuesSource(),
-                valuesSourceConfig.format(),
-                order,
+                hasScript,
+                executionHint,
+                format,
                 missingBucket,
                 missingOrder,
-                hasScript,
-                (
-                    BigArrays bigArrays,
-                    IndexReader reader,
-                    int size,
-                    LongConsumer addRequestCircuitBreakerBytes,
-                    CompositeValuesSourceConfig compositeValuesSourceConfig) -> {
+                order) -> new CompositeValuesSourceConfig(
+                    name,
+                    valuesSourceConfig.fieldType(),
+                    valuesSourceConfig.getValuesSource(),
+                    valuesSourceConfig.format(),
+                    order,
+                    missingBucket,
+                    missingOrder,
+                    hasScript,
+                    (
+                        BigArrays bigArrays,
+                        IndexReader reader,
+                        int size,
+                        LongConsumer addRequestCircuitBreakerBytes,
+                        CompositeValuesSourceConfig compositeValuesSourceConfig) -> {
 
-                    if (valuesSourceConfig.hasOrdinals() && reader instanceof DirectoryReader) {
-                        ValuesSource.Bytes.WithOrdinals vs = (ValuesSource.Bytes.WithOrdinals) compositeValuesSourceConfig.valuesSource();
-                        return new GlobalOrdinalValuesSource(
-                            bigArrays,
-                            compositeValuesSourceConfig.fieldType(),
-                            vs::globalOrdinalsValues,
-                            compositeValuesSourceConfig.format(),
-                            compositeValuesSourceConfig.missingBucket(),
-                            compositeValuesSourceConfig.missingOrder(),
-                            size,
-                            compositeValuesSourceConfig.reverseMul()
-                        );
-                    } else {
-                        ValuesSource.Bytes vs = (ValuesSource.Bytes) compositeValuesSourceConfig.valuesSource();
-                        return new BinaryValuesSource(
-                            bigArrays,
-                            addRequestCircuitBreakerBytes,
-                            compositeValuesSourceConfig.fieldType(),
-                            vs::bytesValues,
-                            compositeValuesSourceConfig.format(),
-                            compositeValuesSourceConfig.missingBucket(),
-                            compositeValuesSourceConfig.missingOrder(),
-                            size,
-                            compositeValuesSourceConfig.reverseMul()
-                        );
+                        if (valuesSourceConfig.hasOrdinals() && reader instanceof DirectoryReader) {
+                            ValuesSource.Bytes.WithOrdinals vs = (ValuesSource.Bytes.WithOrdinals) compositeValuesSourceConfig
+                                .valuesSource();
+                            return new GlobalOrdinalValuesSource(
+                                bigArrays,
+                                compositeValuesSourceConfig.fieldType(),
+                                vs::globalOrdinalsValues,
+                                compositeValuesSourceConfig.format(),
+                                compositeValuesSourceConfig.missingBucket(),
+                                compositeValuesSourceConfig.missingOrder(),
+                                size,
+                                compositeValuesSourceConfig.reverseMul()
+                            );
+                        } else {
+                            ValuesSource.Bytes vs = (ValuesSource.Bytes) compositeValuesSourceConfig.valuesSource();
+                            return new BinaryValuesSource(
+                                bigArrays,
+                                addRequestCircuitBreakerBytes,
+                                compositeValuesSourceConfig.fieldType(),
+                                vs::bytesValues,
+                                compositeValuesSourceConfig.format(),
+                                compositeValuesSourceConfig.missingBucket(),
+                                compositeValuesSourceConfig.missingOrder(),
+                                size,
+                                compositeValuesSourceConfig.reverseMul()
+                            );
+                        }
                     }
-                }
-            ),
+                ),
             false
         );
     }
@@ -206,6 +263,6 @@ public class TermsValuesSourceBuilder extends CompositeValuesSourceBuilder<Terms
     @Override
     protected CompositeValuesSourceConfig innerBuild(ValuesSourceRegistry registry, ValuesSourceConfig config) throws IOException {
         return registry.getAggregator(REGISTRY_KEY, config)
-            .apply(config, name, script() != null, format(), missingBucket(), missingOrder(), order());
+            .apply(config, name, script() != null, getExecutionHint(), format(), missingBucket(), missingOrder(), order());
     }
 }
